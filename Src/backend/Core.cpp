@@ -6,6 +6,7 @@
 #include "Action/SubtractScore.h"
 #include "Action/AddScore.h"
 #include "Action/ExtraClass.h"
+#include <iomanip>
 #include <cstdlib>   //  rand()
 #include <ctime>     //  srand()
 #include <iostream>
@@ -107,42 +108,101 @@ void Player::resetSkipTurn() {
 
 
 
-Board::Board()  {
-std::vector<Action*> actionPool;
-
-    
-    for (int i = 0; i < 3; ++i) actionPool.push_back(new AcademicLeave());
-    for (int i = 0; i < 5; ++i) actionPool.push_back(new SubtractScore());
-    for (int i = 0; i < 3; ++i) actionPool.push_back(new AddScore());
-    for (int i = 0; i < 10; ++i) actionPool.push_back(new ExtraClass());
-
-    
-    std::shuffle(actionPool.begin(), actionPool.end(), std::default_random_engine(static_cast<unsigned>(time(nullptr))));
-
-    int actionIndex = 0;
-
+Board::Board() {
     for (int i = 0; i < size_; ++i) {
-        Action* action = nullptr;
+        std::string effect = "ปกติ";
+        int pointChange = 0;
 
-        if (i % 3 == 0 && i != 0 && actionIndex < actionPool.size()) {
-            action = actionPool[actionIndex++];
+        if (i == 4 || i == 14 || i == 34) {
+            effect = "โดดเรียน -40";
+            pointChange = -40;
+        } else if (i == 9 || i == 29 || i == 39) {
+            effect = "เล่นการพนัน -50";
+            pointChange = -50;
+        } else if (i == 19 || i == 44) {
+            effect = "ติดยา -60";
+            pointChange = -60;
+        } else if (i == 24) {
+            effect = "Academic Leave! ขาดเรียน -100";
+            pointChange = -100;
+        } else if (i == 49) {
+            effect = "จบเกม!";
+            pointChange = 0;
+        } else if (i == 7 || i == 17 || i == 27 || i == 37 || i == 47) {
+            effect = "ช่วยงานอาจารย์ +10";
+            pointChange = +10;
+        } else if (i == 12 || i == 22 || i == 32 || i == 42) {
+            effect = "ทำกิจกรรม +8";
+            pointChange = +8;
+        } else if (i == 2 || i == 20 || i == 35) {
+            effect = "ได้ทุนการศึกษา +15";
+            pointChange = +15;
+        }
+        // ช่อง 10, 20, 30, 40 (index 9, 19, 29, 39) ให้เป็น Draw a card! ได้ถ้าต้องการ
+        else if ((i + 1) % 10 == 0) {
+            effect = "Draw a card!";
+            // pointChange = 0;
         }
 
-        tiles_.emplace_back(i, action);
+        tiles_.push_back(Tile(effect, pointChange));
+    }
+}
+
+void Board::updatePlayersOnTiles(const std::vector<Player>& players) {
+    for (auto& tile : tiles_) {
+        tile.playersOnTile.clear();
+    }
+    for (const auto& player : players) {
+        int pos = player.getPosition();
+        if (pos >= 0 && pos < static_cast<int>(tiles_.size())) {
+            tiles_[pos].playersOnTile.push_back(player.getName());
+        }
     }
 }
 
 void Board::printBoard() const {
-    for (const auto& tile : tiles_) {
-        std::cout << "Tile " << tile.getIndex() << ": ";
-        if (tile.hasAction()) {
-            std::cout << "Action available.\n";
-        } else {
-            std::cout << "No action.\n";
+    const int width = 20, rows = 10, cols = 5;
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col)
+            std::cout << "+" << std::string(width, '-');
+        std::cout << "+\n";
+        for (int col = 0; col < cols; ++col) {
+            int index = row * cols + col;
+            std::string label = "Tile " + std::to_string(index + 1);
+            std::cout << "|" << std::setw(width) << std::left << label;
         }
+        std::cout << "|\n";
+        for (int col = 0; col < cols; ++col) {
+            int index = row * cols + col;
+            std::cout << "|" << std::setw(width) << std::left << tiles_[index].effect;
+        }
+        std::cout << "|\n";
+        // แสดงชื่อผู้เล่นในแต่ละช่อง
+        for (int col = 0; col < cols; ++col) {
+            int index = row * cols + col;
+            std::string pStr = "Player: ";
+            for (const auto& name : tiles_[index].playersOnTile)
+                pStr += name + " ";
+            std::cout << "|" << std::setw(width) << std::left << pStr;
+        }
+        std::cout << "|\n";
     }
+    for (int col = 0; col < cols; ++col)
+        std::cout << "+" << std::string(width, '-');
+    std::cout << "+\n";
 }
 
+int Board::getSize() const {
+    return tiles_.size();
+}
+
+int Board::applyTileEffect(Player& player) {
+    int pos = player.getPosition();
+    if (pos < 0 || pos >= static_cast<int>(tiles_.size())) return 0;
+    int pointChange = tiles_[pos].pointChange;
+    player.updateScore(pointChange);
+    return pointChange;
+}
 bool tile::hasAction() const {
     return action_ != nullptr;
 }
